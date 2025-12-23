@@ -1,5 +1,10 @@
 import discord
 from discord.ext import commands
+import os
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement
+load_dotenv()
 
 # Configuration du bot
 intents = discord.Intents.default()
@@ -31,6 +36,9 @@ ROLES_PLATEFORME = {
     '📱': 'Téléphone',
     '❎': 'Xbox'
 }
+
+# Configuration pour les messages d'au revoir
+SALON_AU_REVOIR_ID = None  # À configurer avec !set_aurevoir
 
 # Dictionnaire qui regroupe tout
 ALL_ROLES = {}
@@ -176,12 +184,66 @@ async def on_raw_reaction_remove(payload):
         except Exception as e:
             print(f"Erreur: {e}")
 
+@bot.command(name='set_aurevoir')
+@commands.has_permissions(administrator=True)
+async def set_aurevoir(ctx, channel_id: int):
+    """Configure le salon pour les messages d'au revoir"""
+    global SALON_AU_REVOIR_ID
+    
+    # Vérifier que le salon existe
+    channel = bot.get_channel(channel_id)
+    if channel is None:
+        await ctx.send("❌ Ce salon n'existe pas!")
+        return
+    
+    SALON_AU_REVOIR_ID = channel_id
+    await ctx.send(f"✅ Les messages d'au revoir seront envoyés dans {channel.mention}")
+
+@bot.event
+async def on_member_remove(member):
+    """Quand quelqu'un quitte le serveur"""
+    
+    if SALON_AU_REVOIR_ID is None:
+        return
+    
+    # Récupérer le salon
+    salon = bot.get_channel(SALON_AU_REVOIR_ID)
+    if salon is None:
+        return
+    
+    # Messages d'au revoir aléatoires
+    messages = [
+        f"👋 **{member.name}** vient de quitter le serveur... Au revoir!",
+        f"😢 **{member.name}** nous a quitté. On te souhaite bonne chance!",
+        f"👋 C'est avec tristesse que nous disons au revoir à **{member.name}**",
+        f"🚪 **{member.name}** a quitté le serveur. À bientôt peut-être!",
+        f"😔 **{member.name}** est parti(e). Merci pour les moments passés ensemble!"
+    ]
+    
+    # Choisir un message aléatoire
+    import random
+    message = random.choice(messages)
+    
+    # Créer un embed
+    embed = discord.Embed(
+        description=message,
+        color=discord.Color.red(),
+        timestamp=discord.utils.utcnow()
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"Le serveur compte maintenant {member.guild.member_count} membres")
+    
+    try:
+        await salon.send(embed=embed)
+        print(f"{member.name} a quitté le serveur")
+    except Exception as e:
+        print(f"Erreur lors de l'envoi du message d'au revoir: {e}")
+
 # Lancer le bot
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
 if __name__ == "__main__":
     TOKEN = os.getenv('TOKEN')
-    bot.run(TOKEN)
+    if TOKEN is None:
+        print("❌ ERREUR: Le token n'est pas configuré!")
+        print("Ajoute la variable TOKEN dans les variables d'environnement de Railway")
+    else:
+        bot.run(TOKEN)

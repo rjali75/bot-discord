@@ -1,0 +1,187 @@
+import discord
+from discord.ext import commands
+
+# Configuration du bot
+intents = discord.Intents.default()
+intents.message_content = True
+intents.reactions = True
+intents.members = True
+
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Configuration des rôles pour chaque message
+ROLES_GENRE = {
+    '👨': 'Homme',
+    '👩': 'Femme',
+    '🌈': 'Non-binaire'
+}
+
+ROLES_JEUX = {
+    '🎯': 'Valorant',
+    '🏗️': 'Fortnite',
+    '⛏️': 'Minecraft',
+    '⚽': 'Rocket League',
+    '🔫': 'Call of Duty',
+    '🗡️': 'League of Legends'
+}
+
+ROLES_PLATEFORME = {
+    '💻': 'PC',
+    '🎮': 'PlayStation',
+    '📱': 'Téléphone',
+    '❎': 'Xbox'
+}
+
+# Dictionnaire qui regroupe tout
+ALL_ROLES = {}
+ALL_ROLES.update(ROLES_GENRE)
+ALL_ROLES.update(ROLES_JEUX)
+ALL_ROLES.update(ROLES_PLATEFORME)
+
+@bot.event
+async def on_ready():
+    print(f'{bot.user} est connecté!')
+    print('Bot prêt à fonctionner')
+
+@bot.command(name='setup_roles')
+@commands.has_permissions(administrator=True)
+async def setup_roles(ctx):
+    """Crée les 3 messages de sélection des rôles"""
+    
+    # ID du salon "roles"
+    SALON_ROLES_ID = 1452831961960677499
+    
+    # Récupérer le salon
+    salon_roles = bot.get_channel(SALON_ROLES_ID)
+    
+    if salon_roles is None:
+        await ctx.send("❌ Je ne trouve pas le salon roles!")
+        return
+    
+    # MESSAGE 1 : GENRE
+    embed1 = discord.Embed(
+        title="👤 Choisis ton genre",
+        description="Réagis avec un emoji pour choisir ton genre !",
+        color=discord.Color.purple()
+    )
+    
+    roles_text1 = ""
+    for emoji, role_name in ROLES_GENRE.items():
+        roles_text1 += f"{emoji} - {role_name}\n"
+    embed1.add_field(name="Genres disponibles:", value=roles_text1, inline=False)
+    
+    message1 = await salon_roles.send(embed=embed1)
+    for emoji in ROLES_GENRE.keys():
+        await message1.add_reaction(emoji)
+    
+    # MESSAGE 2 : JEUX
+    embed2 = discord.Embed(
+        title="🎮 Choisis tes jeux",
+        description="Réagis avec les emojis des jeux auxquels tu joues !",
+        color=discord.Color.green()
+    )
+    
+    roles_text2 = ""
+    for emoji, role_name in ROLES_JEUX.items():
+        roles_text2 += f"{emoji} - {role_name}\n"
+    embed2.add_field(name="Jeux disponibles:", value=roles_text2, inline=False)
+    
+    message2 = await salon_roles.send(embed=embed2)
+    for emoji in ROLES_JEUX.keys():
+        await message2.add_reaction(emoji)
+    
+    # MESSAGE 3 : PLATEFORMES
+    embed3 = discord.Embed(
+        title="🖥️ Choisis tes plateformes",
+        description="Réagis avec les emojis des plateformes que tu utilises !",
+        color=discord.Color.blue()
+    )
+    
+    roles_text3 = ""
+    for emoji, role_name in ROLES_PLATEFORME.items():
+        roles_text3 += f"{emoji} - {role_name}\n"
+    embed3.add_field(name="Plateformes disponibles:", value=roles_text3, inline=False)
+    
+    message3 = await salon_roles.send(embed=embed3)
+    for emoji in ROLES_PLATEFORME.keys():
+        await message3.add_reaction(emoji)
+    
+    await ctx.send("✅ Les 3 messages de rôles ont été créés dans le salon roles!")
+    print("Les 3 messages de rôles ont été créés!")
+
+@bot.event
+async def on_raw_reaction_add(payload):
+    """Quand quelqu'un ajoute une réaction"""
+    
+    # Ignorer les réactions du bot
+    if payload.user_id == bot.user.id:
+        return
+    
+    # Récupérer le serveur et le membre
+    guild = bot.get_guild(payload.guild_id)
+    if guild is None:
+        return
+    
+    member = guild.get_member(payload.user_id)
+    if member is None:
+        return
+    
+    # Vérifier si l'emoji correspond à un rôle
+    emoji = str(payload.emoji)
+    if emoji in ALL_ROLES:
+        role_name = ALL_ROLES[emoji]
+        
+        # Chercher le rôle
+        role = discord.utils.get(guild.roles, name=role_name)
+        
+        if role is None:
+            print(f"Le rôle {role_name} n'existe pas sur le serveur!")
+            return
+        
+        # Donner le rôle
+        try:
+            await member.add_roles(role)
+            print(f"{member.name} a reçu le rôle {role_name}")
+        except Exception as e:
+            print(f"Erreur: {e}")
+
+@bot.event
+async def on_raw_reaction_remove(payload):
+    """Quand quelqu'un enlève une réaction"""
+    
+    # Récupérer le serveur et le membre
+    guild = bot.get_guild(payload.guild_id)
+    if guild is None:
+        return
+    
+    member = guild.get_member(payload.user_id)
+    if member is None:
+        return
+    
+    # Vérifier si l'emoji correspond à un rôle
+    emoji = str(payload.emoji)
+    if emoji in ALL_ROLES:
+        role_name = ALL_ROLES[emoji]
+        
+        # Chercher le rôle
+        role = discord.utils.get(guild.roles, name=role_name)
+        
+        if role is None:
+            return
+        
+        # Retirer le rôle
+        try:
+            await member.remove_roles(role)
+            print(f"{member.name} a perdu le rôle {role_name}")
+        except Exception as e:
+            print(f"Erreur: {e}")
+
+# Lancer le bot
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+if __name__ == "__main__":
+    TOKEN = os.getenv('TOKEN')
+    bot.run(TOKEN)
